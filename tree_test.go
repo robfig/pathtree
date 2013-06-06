@@ -15,6 +15,10 @@ func TestTree(t *testing.T) {
 	n.Add("/:a/:b", 4)
 	n.Add("/not/found", 5)
 
+	for _, e := range n.edges {
+		t.Logf("n[%s]", e.name)
+	}
+
 	found(t, n, "/", nil, 0)
 	found(t, n, "/path/to/nowhere", nil, 1)
 	found(t, n, "/path/to/nowhere/", nil, 1)

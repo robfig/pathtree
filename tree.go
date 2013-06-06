@@ -8,14 +8,15 @@ package pathtree
 
 import (
 	"errors"
+	"sort"
 	"strings"
 )
 
 type Node struct {
-	edges    map[string]*Node // the various path elements leading out of this node.
-	wildcard *Node            // if set, this node had a wildcard as its path element.
-	leaf     *Leaf            // if set, this is a terminal node for this leaf.
-	leafs    int              // counter for # leafs in the tree
+	edges    []*edge // the various path elements leading out of this node.
+	wildcard *Node   // if set, this node had a wildcard as its path element.
+	leaf     *Leaf   // if set, this is a terminal node for this leaf.
+	leafs    int     // counter for # leafs in the tree
 }
 
 type Leaf struct {
@@ -24,8 +25,21 @@ type Leaf struct {
 	order     int         // the order this leaf was added
 }
 
+type edge struct {
+	name string
+	node *Node
+}
+
+type byName []*edge
+
+func (e byName) Search(k string) (i int, found bool) {
+	i = sort.Search(len(e), func(i int) bool { return e[i].name >= k })
+	found = i < len(e) && e[i].name == k
+	return
+}
+
 func New() *Node {
-	return &Node{edges: make(map[string]*Node)}
+	return &Node{}
 }
 
 // Add a path and its associated value to the Trie.
@@ -63,10 +77,15 @@ func (n *Node) add(order int, elements, wildcards []string, val interface{}) err
 		return n.wildcard.add(order, elements, append(wildcards, el[1:]), val)
 	}
 
-	e, ok := n.edges[el]
-	if !ok {
+	var e *Node
+	index, found := byName(n.edges).Search(el)
+	if found {
+		e = n.edges[index].node
+	} else {
 		e = New()
-		n.edges[el] = e
+		n.edges = append(n.edges, nil)
+		copy(n.edges[index+1:], n.edges[index:])
+		n.edges[index] = &edge{name: el, node: e}
 	}
 
 	return e.add(order, elements, wildcards, val)
@@ -93,8 +112,9 @@ func (n *Node) find(elements, exp []string) (leaf *Leaf, expansions []string) {
 
 	var el string
 	el, elements = elements[0], elements[1:]
-	if nextNode, ok := n.edges[el]; ok {
-		leaf, expansions = nextNode.find(elements, exp)
+
+	if index, found := byName(n.edges).Search(el); found {
+		leaf, expansions = n.edges[index].node.find(elements, exp)
 	}
 	if n.wildcard == nil {
 		return
